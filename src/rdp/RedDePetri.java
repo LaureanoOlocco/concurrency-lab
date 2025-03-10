@@ -1,6 +1,7 @@
 package rdp;
 
 import java.util.Arrays;
+
 import static matriz.Matriz.*;
 
 /**
@@ -19,21 +20,22 @@ public class RedDePetri {
     };
 
     private final static int[][] MATRIZ_DE_INCIDENCIA = {
-            {-1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-            {-1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0},
-            {-1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 0},
-            {0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 1, 1, -1, -1, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, -1, -1, 1, 0, 1, 0},
-            {0, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, -1}
+            // T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11
+            {-1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},  // P0
+            {-1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // P1
+            {1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // P2
+            {0, 1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0}, // P3
+            {-1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},  // P4
+            {0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 0},  // P5
+            {0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 0},  // P6
+            {0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0},  // P7
+            {0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0},  // P8
+            {0, 0, 0, 0, 1, 1, -1, -1, 0, 0, 0, 0}, // P9
+            {0, 0, 0, 0, 0, 0, -1, -1, 1, 0, 1, 0}, // P10
+            {0, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0},  // P11
+            {0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0},  // P12
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0},  // P13
+            {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, -1}   // P14
     };
 
     private final static int[][] INVARIANTES_DE_TRANSICION = {
@@ -106,7 +108,7 @@ public class RedDePetri {
     /**
      * Intenta disparar una transición.
      *
-     * @param t Índice de la transición a disparar
+     * @param t             Índice de la transición a disparar
      * @param sensibilizada Indica si la transición está sensibilizada
      * @return true si el disparo fue exitoso, false en caso contrario
      */
@@ -148,16 +150,20 @@ public class RedDePetri {
     }
 
     /**
-     * Configura los tiempos de las transiciones temporales.
+     * Configura los tiempos de las transiciones temporales según la configuración seleccionada.
      *
-     * @param i Perfil de tiempos a utilizar
+     * @param configuracionTemporal Configuración temporal a utilizar:
+     *                              1 - Configuración rápida
+     *                              2 - Configuración media
+     *                              3 - Configuración lenta
+     *                              otro - Sin tiempos (todos en cero)
      */
-    private void setTiempos(int i) {
-        alfa = switch (i) {
-            case 1 -> new long[]{0, 3, 0, 0, 5, 5, 0, 0, 7, 3, 3, 0};
-            case 2 -> new long[]{0, 10, 0, 0, 15, 15, 0, 0, 20, 10, 12, 0};
-            case 3 -> new long[]{0, 30, 0, 0, 50, 50, 0, 0, 70, 30, 35, 0};
-            default -> new long[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    private void setTiempos(int configuracionTemporal) {
+        alfa = switch (configuracionTemporal) {
+            case 1 -> new long[]{0, 3, 0, 0, 5, 5, 0, 0, 7, 3, 3, 0};        // Configuración rápida
+            case 2 -> new long[]{0, 10, 0, 0, 15, 15, 0, 0, 20, 10, 12, 0};  // Configuración media
+            case 3 -> new long[]{0, 30, 0, 0, 50, 50, 0, 0, 70, 30, 35, 0};  // Configuración lenta
+            default -> new long[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};       // Sin restricciones temporales
         };
     }
 
@@ -173,7 +179,7 @@ public class RedDePetri {
             int[] matrizTransicion = crearMatrizTransicion(i, TRANSICIONES_TOTALES);
             int[] marcadoPosible = multiplicarMatriz(MATRIZ_DE_INCIDENCIA, matrizTransicion);
             marcadoPosible = sumarMatriz(marcado, marcadoPosible);
-            sensibilizadas[i] = estaSensibilizada(marcadoPosible) ? 1 : 0;
+            sensibilizadas[i] = tieneTokens(marcadoPosible) ? 1 : 0;
         }
         return sensibilizadas;
     }
@@ -187,7 +193,7 @@ public class RedDePetri {
     public int[] getSensibilizadasTiempo(long time) {
         int[] sensibilizadas = getSensibilizadas();
         int[] sensibilizadasTiempo = new int[TRANSICIONES_TOTALES];
-        // Método incompleto - se debe implementar la lógica de tiempo
+        // Mét odo incompleto - se debe implementar la lógica de tiempo
         // for (int i = 0; i < TRANSICIONES_TOTALES; i++) {
         //     sensibilizadasTiempo[i] = (sensibilizadas[i] == 1 && isSensibilizadaTiempo(i, time)) ? 1 : 0;
         // }
@@ -216,7 +222,7 @@ public class RedDePetri {
      * @param marcado Marcado a verificar
      * @return true si el marcado sensibiliza alguna transición, false en caso contrario
      */
-    private boolean estaSensibilizada(int[] marcado) {
+    private boolean tieneTokens(int[] marcado) {
         // Verifica si la transición está sensibilizada (todos los lugares tienen suficientes tokens)
         for (int tokens : marcado) {
             if (tokens < 0) {
@@ -260,7 +266,7 @@ public class RedDePetri {
     /**
      * Actualiza el estado de la red después de un disparo.
      *
-     * @param t Transición disparada
+     * @param t              Transición disparada
      * @param marcadoPosible Nuevo marcado después del disparo
      */
     private void actualizarRed(int t, int[] marcadoPosible) {
@@ -303,11 +309,21 @@ public class RedDePetri {
     /**
      * Establece la marca de tiempo para una transición.
      *
-     * @param t Índice de la transición
+     * @param t    Índice de la transición
      * @param time Tiempo a establecer
      */
     public void setTimeStamp(int t, long time) {
         timeStamp[t] = time;
+    }
+
+    /**
+     * Verifica si una transición específica está sensibilizada según el marcado actual.
+     *
+     * @param t Índice de la transición a verificar
+     * @return true si la transición está sensibilizada, false en caso contrario
+     */
+    public boolean estaTransicionSensibilizada(int t) {
+        return getSensibilizadas()[t] == 1;
     }
 
     /**
@@ -318,6 +334,7 @@ public class RedDePetri {
     public int[] getMarcado() {
         return marcado;
     }
+
 
     /**
      * Obtiene el contador de disparos para todas las transiciones.
