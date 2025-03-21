@@ -3,7 +3,6 @@ package agencia;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Arrays;
 
-
 import monitor.Monitor;
 
 /**
@@ -35,7 +34,7 @@ public class Proceso implements Runnable {
     /**
      * Contador de reservas totales realizadas por este proceso
      */
-    private int reservasTotales;
+    // private int reservasTotales;
 
     /**
      * Arreglo que almacena las transiciones que este proceso puede disparar
@@ -43,6 +42,9 @@ public class Proceso implements Runnable {
     private int[] transiciones;
 
     private final String nombreProceso;
+
+    private final AtomicInteger reservasTotales = new AtomicInteger();
+
 
     /**
      * Constructor para crear un nuevo proceso.
@@ -55,7 +57,7 @@ public class Proceso implements Runnable {
         this.agencia = agencia;
         this.transiciones = Arrays.copyOf(transiciones, transiciones.length); // Defensiva
         this.nombreProceso = nombreProceso;
-        this.reservasLocales = 0;
+        //this.reservasTotales = 0;
     }
 
     /**
@@ -67,5 +69,48 @@ public class Proceso implements Runnable {
     @Override
     public void run() {
         // La implementación específica debe ser añadida aquí
+        if (transiciones == null || transiciones.length == 0) return;
+
+        try {
+            if (transiciones[0] == 0) {
+                entradaAgencia();
+            } else {
+                realizarAccion();
+            }
+        } catch (InterruptedException e) {
+            System.err.println("El hilo fue interrumpido: " + e.getMessage());
+            Thread.currentThread().interrupt();
+        }
     }
+
+    private void entradaAgencia() throws InterruptedException {
+        while (reservasTotales.get() < DISPAROS_TOTALES) {
+            for (int transicion : transiciones) {
+                if (monitor.fireTransition(transicion)) {
+                    agencia.transicionDisparada(transicion);
+                    if (transicion == 0) {
+                        reservasTotales.incrementAndGet();
+                    }
+                }
+            }
+            System.out.println("\n ----------------Reservas totales: " + reservasTotales.get() + "---------------------------------\n");
+        }
+        if (reservasTotales.get() == DISPAROS_TOTALES) {
+            throw new InterruptedException("Se alcanzaron los disparos máximos.");
+        }
+    }
+
+    private void realizarAccion() throws InterruptedException {
+        while (!agencia.limiteAlcanzado()) {
+            for (int transicion : transiciones) {
+                if (monitor.fireTransition(transicion)) {
+                    agencia.transicionDisparada(transicion);
+                }
+            }
+        }
+        if (reservasTotales.get() == DISPAROS_TOTALES) {
+            throw new InterruptedException("Se alcanzaron los disparos máximos.");
+        }
+    }
+
 }
