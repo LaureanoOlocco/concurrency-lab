@@ -29,20 +29,19 @@ public class Proceso implements Runnable {
     /**
      * Agencia a la que pertenece este proceso
      */
-    private Agencia agencia;
-
-    /**
-     * Contador de reservas totales realizadas por este proceso
-     */
-    // private int reservasTotales;
+    private final Agencia agencia;
 
     /**
      * Arreglo que almacena las transiciones que este proceso puede disparar
      */
-    private int[] transiciones;
+    private final int[] transiciones;
+
 
     private final String nombreProceso;
 
+    /**
+     * Contador de reservas totales realizadas por este proceso
+     */
     private final AtomicInteger reservasTotales = new AtomicInteger();
 
 
@@ -93,7 +92,7 @@ public class Proceso implements Runnable {
                     }
                 }
             }
-            System.out.println("\n ----------------Reservas totales: " + reservasTotales.get() + "---------------------------------\n");
+            System.out.println("\n -------------- Reservas totales: " + reservasTotales.get() + "--------------\n");
         }
         if (reservasTotales.get() == DISPAROS_TOTALES) {
             throw new InterruptedException("Se alcanzaron los disparos máximos.");
@@ -113,4 +112,7 @@ public class Proceso implements Runnable {
         }
     }
 
+    public String getNombreProceso() {
+        return nombreProceso;
+    }
 }
