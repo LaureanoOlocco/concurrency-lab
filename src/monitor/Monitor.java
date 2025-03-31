@@ -69,7 +69,7 @@ public class Monitor implements MonitorInterface {
             cola[i] = new Semaphore(0);
         }
         redDePetri = new RedDePetri();
-        //politica = new Politicas(redDePetri);
+        politica = new Politica(redDePetri);
     }
 
     /**
@@ -105,26 +105,29 @@ public class Monitor implements MonitorInterface {
         do {
             // Verifica si ya se completaron todos los disparos requeridos
             if (disparosCompletados()) {
+                liberarHilos();
                 liberarMutex();
                 break;
             }
 
             // Intenta disparar la transición
-            disparoEfectuado = redDePetri.disparar(transicion, redDePetri.estaTransicionSensibilizada(transicion));
+            disparoEfectuado = redDePetri.disparar(transicion);
+            System.out.println("Resultado: " + disparoEfectuado + " Transicion: " + transicion);
             liberarMutex();
 
             // Si no se pudo disparar, el proceso se bloquea en su correspondiente cola
             if (!disparoEfectuado) {
                 try {
+                    System.out.println("Transicion " + transicion + " en cola");
                     cola[transicion].acquire();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
 
-        } while (!disparosCompletados());
+        } while (!disparoEfectuado && !disparosCompletados());
 
-        return false;
+        return disparoEfectuado;
     }
 
     /**
@@ -132,8 +135,10 @@ public class Monitor implements MonitorInterface {
      * Si el semáforo no está disponible, el proceso se bloquea hasta que lo esté.
      */
     private void adquirirMutex() {
+        System.out.println(Thread.currentThread().getName() + " intenta adquirir el mutex");
         try {
             mutex.acquire();
+            System.out.println(Thread.currentThread().getName() + " adquirió el mutex");
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -170,7 +175,7 @@ public class Monitor implements MonitorInterface {
     private int[] obtenerTransiciones() {
         // Obtiene las transiciones sensibilizadas y en cola
         long tiempo = System.currentTimeMillis();
-        int[] sensibilizadas = redDePetri.getSensibilizadasTiempo(tiempo);
+        int[] sensibilizadas = redDePetri.getSensibilizadas();
         int[] enCola = transicionesEnCola();
         int[] transiciones = new int[TRANSICIONES_TOTALES];
         // And entre transiciones sensibilizadas y en cola
@@ -211,5 +216,15 @@ public class Monitor implements MonitorInterface {
      */
     private void liberarMutex() {
         if (!despertarTransicion()) mutex.release();
+        System.out.println(Thread.currentThread().getName() + " libero el mutex, permisos: " + mutex.availablePermits());
+
+    }
+
+    private void liberarHilos() {
+        for (int i = 0; i < cola.length; i++) {
+            if (cola[i].hasQueuedThreads()) {
+                cola[i].release();
+            }
+        }
     }
 }

@@ -108,34 +108,29 @@ public class RedDePetri {
     /**
      * Intenta disparar una transición.
      *
-     * @param t             Índice de la transición a disparar
-     * @param sensibilizada Indica si la transición está sensibilizada
+     * @param t Índice de la transición a disparar
      * @return true si el disparo fue exitoso, false en caso contrario
      */
-    public boolean disparar(int t, boolean sensibilizada) {
-        // Calcula el marcado posible después del disparo
-        int[] matrizTransicion = crearMatrizTransicion(t, TRANSICIONES_TOTALES);
-        int[] marcadoPosible = multiplicarMatriz(MATRIZ_DE_INCIDENCIA, matrizTransicion);
+    public boolean disparar(int t) {
+        int matrizTransicion[] = crearMatrizTransicion(t, TRANSICIONES_TOTALES);
+        int marcadoPosible[] = multiplicarMatriz(MATRIZ_DE_INCIDENCIA, matrizTransicion);
         marcadoPosible = sumarMatriz(marcado, marcadoPosible);
-
-        // Verifica si está sensibilizada
-        if (sensibilizada) {
-            // Verifica si cumple invariantes de plaza
+        if (tieneTokens(marcadoPosible)) {
             if (invariantesPlaza(marcadoPosible)) {
-                // Actualiza el estado de la red
-                actualizarRed(t, marcadoPosible);
+                marcado = marcadoPosible;
+                disparos[t] += 1;
                 return true;
             } else {
                 System.out.println("Error con los invariantes de plaza");
+                for (int i = 0; i < marcado.length; i++) {
+                    System.out.print(marcadoPosible[i] + " ");
+                }
+                System.out.println("");
                 return false;
             }
         } else {
-            // Maneja el caso cuando la transición no está sensibilizada
-            if (transicionEnEspera(t)) {
-                System.out.println("Ya hay una transición esperando disparar");
-            } else {
-                System.out.println("La transición " + t + " no está sensibilizada");
-            }
+            System.out.println("La transicion " + t + " no está sensibilizada");
+
             return false;
         }
     }

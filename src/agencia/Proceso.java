@@ -77,7 +77,7 @@ public class Proceso implements Runnable {
                 realizarAccion();
             }
         } catch (InterruptedException e) {
-            System.err.println("El hilo fue interrumpido: " + e.getMessage());
+            // System.err.println("El hilo fue interrumpido: " + e.getMessage());
             Thread.currentThread().interrupt();
         }
     }
