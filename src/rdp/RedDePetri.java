@@ -12,12 +12,26 @@ public class RedDePetri {
     // Constantes
     private final static int TRANSICIONES_TOTALES = 12;
     private final static long INF = 1000000000;
-    private final static int[] RESULTADOS_IP = {1, 5, 1, 1, 1, 5};
+
+    private final static int[] RESULTADOS_IP = {
+            1, 5, 1, 1, 1, 5
+    };
 
     // Configuración inicial de la red
     private final static int[] MARCADO_INICIAL = {
             5, 1, 0, 0, 5, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0
     };
+
+    /**
+     * Matriz de Incidencia (W) de la red de Petri.
+     * <p>
+     * Esta matriz representa la estructura de la red y se utiliza para calcular
+     * los cambios en el marcado cuando se disparan las transiciones.
+     * <p>
+     * La matriz de incidencia se construye como W = W⁺ - W⁻ donde:
+     * W⁺ es la matriz de incidencia de salida (arcos que van de transiciones a plazas)
+     * W⁻ es la matriz de incidencia de entrada (arcos que van de plazas a transiciones)
+     */
 
     private final static int[][] MATRIZ_DE_INCIDENCIA = {
             // T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11
@@ -55,7 +69,11 @@ public class RedDePetri {
     };
 
     // Atributos de la instancia
-    private final int[] tTemporales = {1, 4, 5, 8, 9, 10};
+    private final int[] transicionesTemporales = {
+            1, 4, 5, 8, 9, 10
+    };
+
+
     private int[] marcado;
     private int[] disparos;
     private long[] alfa;            // Tiempo mínimo de sensibilización
@@ -63,7 +81,7 @@ public class RedDePetri {
     private long[] timeStamp;       // Marca de tiempo de sensibilización
     private long tiempo;            // Tiempo actual del sistema
     private boolean[] tEsperando;   // Transiciones en espera de disparo
-    private String tDisparadas;     // Registro de transiciones disparadas
+    private String transicionesDisparadas;     // Registro de transiciones disparadas
 
     /**
      * Constructor de la Red de Petri.
@@ -99,38 +117,64 @@ public class RedDePetri {
         tEsperando = new boolean[TRANSICIONES_TOTALES];
         Arrays.fill(tEsperando, false);
 
-        tDisparadas = "";
+        transicionesDisparadas = "";
 
         // Configuración de tiempos de transiciones
-        setTiempos(1);
+        setTiempos(3);
     }
 
     /**
-     * Intenta disparar una transición.
+     * Intenta disparar (ejecutar) una transición en una red de Petri.
+     * <p>
+     * Este metodo implementa la ecuación fundamental de las redes de Petri:
+     * M' = M + W·s
+     * Donde:
+     * - M' es el nuevo marcado (nuevoMarcado)
+     * - M es el marcado actual (marcado)
+     * - W es la matriz de incidencia (MATRIZ_DE_INCIDENCIA)
+     * - S es el vector característico de la secuencia de disparo (matrizTransicion)
+     * que contiene un 1 en la posición de la transición a disparar y 0 en las demás
+     * <p>
+     * El metodo verifica que:
+     * 1. La transición esté sensibilizada (tenga suficientes tokens en sus plazas de entrada)
+     * 2. El disparo mantenga los invariantes de plaza (restricciones estructurales de la red)
      *
-     * @param t Índice de la transición a disparar
-     * @return true si el disparo fue exitoso, false en caso contrario
+     * @param t Índice de la transición a disparar (0-indexado)
+     * @return true si el disparo fue exitoso (transición sensibilizada y se mantienen los invariantes),
+     * false en caso contrario (transición no sensibilizada o se violan los invariantes)
+     * @note Asume que t está dentro del rango válido [0, TRANSICIONES_TOTALES-1]
      */
-    public boolean disparar(int t) {
-        int matrizTransicion[] = crearMatrizTransicion(t, TRANSICIONES_TOTALES);
-        int marcadoPosible[] = multiplicarMatriz(MATRIZ_DE_INCIDENCIA, matrizTransicion);
-        marcadoPosible = sumarMatriz(marcado, marcadoPosible);
-        if (tieneTokens(marcadoPosible)) {
-            if (invariantesPlaza(marcadoPosible)) {
-                marcado = marcadoPosible;
-                disparos[t] += 1;
+    public boolean disparar(int t, boolean puedeDisparar) {
+
+        // Crear el vector característico con un 1 en la posición t
+        int[] matrizTransicion = crearMatrizTransicion(t, TRANSICIONES_TOTALES);
+
+        // Calcular W·S (producto de la matriz de incidencia por el vector característico)
+        int[] Ws = multiplicarMatriz(MATRIZ_DE_INCIDENCIA, matrizTransicion);
+
+        // Calcular el nuevo marcado: M' = M + W·S
+        int[] nuevoMarcado = sumarMatriz(marcado, Ws);
+
+        // Verificar que el nuevo marcado tenga tokens
+        if (puedeDisparar) {
+
+            // Verificar que se mantengan los invariantes de plaza
+            if (invariantesPlaza(nuevoMarcado)) {
+                // Llama al metodo actualizar red.
+                actualizarRed(t, nuevoMarcado);
                 return true;
+
             } else {
                 System.out.println("Error con los invariantes de plaza");
                 for (int i = 0; i < marcado.length; i++) {
-                    System.out.print(marcadoPosible[i] + " ");
+                    System.out.print(nuevoMarcado[i] + " ");
                 }
-                System.out.println("");
+                System.out.println();
                 return false;
             }
-        } else {
-            System.out.println("La transicion " + t + " no está sensibilizada");
 
+        } else {
+            System.out.println("La transición " + t + " no está sensibilizada");
             return false;
         }
     }
@@ -182,16 +226,15 @@ public class RedDePetri {
     /**
      * Obtiene las transiciones sensibilizadas por tiempo.
      *
-     * @param time Tiempo actual
+     * @param tiempo Tiempo actual
      * @return Array con 1 en las posiciones de transiciones sensibilizadas por tiempo, 0 en el resto
      */
-    public int[] getSensibilizadasTiempo(long time) {
+    public int[] getSensibilizadasTiempo(long tiempo) {
         int[] sensibilizadas = getSensibilizadas();
         int[] sensibilizadasTiempo = new int[TRANSICIONES_TOTALES];
-        // Mét odo incompleto - se debe implementar la lógica de tiempo
-        // for (int i = 0; i < TRANSICIONES_TOTALES; i++) {
-        //     sensibilizadasTiempo[i] = (sensibilizadas[i] == 1 && isSensibilizadaTiempo(i, time)) ? 1 : 0;
-        // }
+        for (int i = 0; i < TRANSICIONES_TOTALES; i++) {
+            sensibilizadasTiempo[i] = (sensibilizadas[i] == 1 && estaSensibilizadaEnTiempo(i, tiempo)) ? 1 : 0;
+        }
         return sensibilizadasTiempo;
     }
 
@@ -239,19 +282,19 @@ public class RedDePetri {
         Arrays.fill(sumaInvariantes, 0);
 
         // boolean que almacena los invariantes
-        boolean[] invariantes = new boolean[RESULTADOS_IP.length];
+        boolean[] invariantesCumplidos = new boolean[RESULTADOS_IP.length];
 
         // Calcula la suma para cada invariante
         for (int i = 0; i < INVARIANTES_DE_PLAZA.length; i++) {
             for (int inv : INVARIANTES_DE_PLAZA[i]) {
                 sumaInvariantes[i] += marcado[inv];
             }
-            invariantes[i] = sumaInvariantes[i] == RESULTADOS_IP[i];
+            invariantesCumplidos[i] = sumaInvariantes[i] == RESULTADOS_IP[i];
         }
 
         // Verifica que todos los invariantes se cumplan
         boolean respetaInvariantes = true;
-        for (boolean resultado : invariantes) {
+        for (boolean resultado : invariantesCumplidos) {
             respetaInvariantes = resultado && respetaInvariantes;
         }
 
@@ -261,21 +304,21 @@ public class RedDePetri {
     /**
      * Actualiza el estado de la red después de un disparo.
      *
-     * @param t              Transición disparada
-     * @param marcadoPosible Nuevo marcado después del disparo
+     * @param t            Transición disparada
+     * @param nuevoMarcado Nuevo marcado después del disparo
      */
-    private void actualizarRed(int t, int[] marcadoPosible) {
+    private void actualizarRed(int t, int[] nuevoMarcado) {
         // Guarda el estado de sensibilización actual
         int[] sensibilizadasActual = getSensibilizadas();
 
         // Actualiza el marcado
-        marcado = marcadoPosible;
+        marcado = nuevoMarcado;
 
         // Aumenta la cuenta de disparos de esa transición
         disparos[t]++;
 
         // Registra la transición disparada
-        tDisparadas += "T" + t + " ";
+        transicionesDisparadas += "T" + t + " ";
 
         // Obtiene las nuevas transiciones sensibilizadas
         int[] nuevasSensibilizadas = getSensibilizadas();
@@ -312,6 +355,55 @@ public class RedDePetri {
     }
 
     /**
+     * Establece el estado de espera de una transición.
+     * <p>
+     * Este metodo actualiza el array de estados de espera (tEsperando) que indica
+     * si una transición está actualmente en proceso de espera debido a restricciones
+     * temporales. Este estado puede ser consultado por otros componentes del sistema
+     * para determinar si una transición está temporalmente bloqueada.
+     *
+     * @param transicion El índice de la transición a modificar (0-indexado)
+     * @param estado     true si la transición debe marcarse como en espera,
+     *                   false si la transición ya no está en espera
+     */
+    public void setEstadoDeEspera(int transicion, boolean estado) {
+        tEsperando[transicion] = estado;
+    }
+
+    /**
+     * Verifica si una transición es temporal.
+     *
+     * @param transicion Índice de la transición a verificar
+     * @return true si la transición es temporal, false en caso contrario
+     */
+    public boolean esTransicionTemporal(int transicion) {
+        int[] transicionesTemporales = this.transicionesTemporales;
+
+        // Busca en el array de transiciones temporales
+        for (int t : transicionesTemporales) {
+            if (transicion == t) {
+                return true; // La transición tiene restricciones temporales
+            }
+        }
+
+        // La transición no está en la lista de transiciones temporales
+        return false;
+    }
+
+    /**
+     * Verifica si una transición está sensibilizada en tiempo.
+     *
+     * @param transicion   Índice de la transición a verificar
+     * @param tiempoActual Tiempo actual en milisegundos
+     * @return true si ha pasado el tiempo mínimo (alfa) desde su sensibilización,
+     * false si aún no alcanza el tiempo mínimo
+     */
+    public boolean estaSensibilizadaEnTiempo(int transicion, long tiempoActual) {
+        // Verifica si el tiempo transcurrido desde la marca de tiempo es mayor o igual que alfa
+        return (tiempoActual - timeStamp[transicion]) >= alfa[transicion];
+    }
+
+    /**
      * Verifica si una transición específica está sensibilizada según el marcado actual.
      *
      * @param t Índice de la transición a verificar
@@ -341,11 +433,29 @@ public class RedDePetri {
     }
 
     /**
+     * Obtiene el tiempo mínimo (alfa) de la ventana temporal de una transición.
+     *
+     * @param transicion Índice de la transición
+     * @return Tiempo mínimo en milisegundos para la transición especificada
+     */
+    public long obtenerTiempoMinimo(int transicion) {
+        return alfa[transicion];
+    }
+
+    public long getTimeStamp(int t) {
+        return timeStamp[t];
+    }
+
+    private int[][] getInvariantesDeTransicion() {
+        return INVARIANTES_DE_TRANSICION;
+    }
+
+    /**
      * Obtiene el registro de transiciones disparadas.
      *
      * @return Cadena con las transiciones disparadas
      */
     public String getTransicionesDisparadas() {
-        return tDisparadas;
+        return transicionesDisparadas;
     }
 }

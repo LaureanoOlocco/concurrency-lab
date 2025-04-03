@@ -1,9 +1,10 @@
 /**
  * Clase principal que inicia la aplicación de la agencia.
  * Configura y ejecuta los diferentes procesos de la agencia utilizando hilos independientes.
- * Cada proceso se encarga de gestionar determinados segmentos del flujo de trabajo.
+ * Cada proceso se encarga de gestionar determinados segmentos de la red de petri.
  *
- * @author Tu_Nombre
+ * @author Laureano Olocco
+ * @author Ezequiel Landaeta
  * @version 1.0
  */
 

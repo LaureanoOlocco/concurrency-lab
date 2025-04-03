@@ -99,8 +99,9 @@ public class Monitor implements MonitorInterface {
      * @return true si el disparo se completó con éxito, false en caso contrario
      */
     public boolean fireTransition(int transicion) {
-        boolean disparoEfectuado = false;
         adquirirMutex();
+        boolean disparoEfectuado = false;
+        boolean puedeDisparar = false;
 
         do {
             // Verifica si ya se completaron todos los disparos requeridos
@@ -109,9 +110,9 @@ public class Monitor implements MonitorInterface {
                 liberarMutex();
                 break;
             }
-
+            puedeDisparar = puedeDispararse(transicion);
             // Intenta disparar la transición
-            disparoEfectuado = redDePetri.disparar(transicion);
+            disparoEfectuado = redDePetri.disparar(transicion, puedeDisparar);
             System.out.println("Resultado: " + disparoEfectuado + " Transicion: " + transicion);
             liberarMutex();
 
@@ -128,6 +129,112 @@ public class Monitor implements MonitorInterface {
         } while (!disparoEfectuado && !disparosCompletados());
 
         return disparoEfectuado;
+    }
+
+    /**
+     * Verifica si una transición está antes de su ventana temporal.
+     * <p>
+     * Este metodo determina si una transición temporal ha alcanzado su tiempo mínimo
+     * de sensibilización (alfa). Una transición está "antes de la ventana" cuando
+     * el tiempo actual es menor que el tiempo mínimo requerido para dispararla.
+     *
+     * @param transicion   Índice de la transición a verificar
+     * @param tiempoActual Tiempo actual en milisegundos (System.currentTimeMillis)
+     * @return true si la transición está antes de su ventana temporal (debe esperar),
+     * false si está dentro de su ventana o no es una transición temporal
+     */
+    private boolean estaAntesDeVentanaTemporal(int transicion, long tiempoActual) {
+        // Solo aplica a transiciones con restricciones temporales
+        if (redDePetri.esTransicionTemporal(transicion)) {
+            // Verifica si la transición está sensibilizada en tiempo
+            // Está fuera (antes) de la ventana temporal
+            // Si está en la ventana devuelve false, si no devuelve true
+            return !redDePetri.estaSensibilizadaEnTiempo(transicion, tiempoActual);
+        }
+        return false; // No es una transición temporal
+    }
+
+
+    /**
+     * Realiza la espera necesaria cuando una transición debe retrasar su disparo.
+     * <p>
+     * Cuando una transición está sensibilizada por marcado, pero aún no cumple con
+     * el tiempo mínimo de su ventana temporal (alfa), este metodo suspende el hilo
+     * actual hasta que se alcance dicho tiempo mínimo.
+     *
+     * @param transicion   Índice de la transición que debe esperar
+     * @param tiempoEspera Tiempo en milisegundos que debe esperar para alcanzar
+     *                     el límite inferior de la ventana temporal
+     */
+    private void esperarTiempoMinimo(int transicion, long tiempoEspera) {
+        // Marca la transición como en estado de espera
+        redDePetri.setEstadoDeEspera(transicion, true);
+
+        // Libera el mutex para que otros hilos puedan ejecutarse
+        liberarMutex();
+
+        try {
+            // Suspende el hilo por el tiempo necesario
+            Thread.sleep(tiempoEspera);
+
+            // Marca la transición como ya no en espera
+            redDePetri.setEstadoDeEspera(transicion, false);
+
+            // Vuelve a adquirir el mutex para continuar
+            adquirirMutex();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Verifica si una transición está sensibilizada, considerando tanto el marcado
+     * como las restricciones temporales.
+     * <p>
+     * Una transición está completamente sensibilizada cuando:
+     * 1. Tiene suficientes tokens en sus plazas de entrada (sensibilizada por marcado)
+     * 2. Ha cumplido con el tiempo mínimo de espera si es una transición temporal
+     * <p>
+     * Si la transición está sensibilizada por marcado pero aún no ha alcanzado
+     * su tiempo mínimo, este metodo hará que el hilo espere lo necesario.
+     *
+     * @param transicion Índice de la transición a verificar
+     * @return true si la transición está sensibilizada (o lo estará después de esperar),
+     * false si no está sensibilizada por marcado
+     */
+    private boolean estaTransicionSensibilizada(int transicion) {
+        // Verifica primero si está sensibilizada por marcado
+        if (redDePetri.estaTransicionSensibilizada(transicion)) {
+            // Obtiene el tiempo actual
+            long tiempoActual = System.currentTimeMillis();
+
+            // Verifica si está antes de su ventana temporal
+            if (estaAntesDeVentanaTemporal(transicion, tiempoActual)) {
+                // Calcula cuánto tiempo debe esperar para alcanzar el límite inferior
+                long tiempoEspera = redDePetri.getTimeStamp(transicion) + redDePetri.obtenerTiempoMinimo(transicion) - tiempoActual;
+
+                // Espera el tiempo necesario
+                esperarTiempoMinimo(transicion, tiempoEspera);
+            }
+
+            // La transición está completamente sensibilizada (o lo estará después de esperar)
+            return true;
+        }
+
+        // No está sensibilizada por marcado
+        return false;
+    }
+
+    /**
+     * Verifica si una transición cumple todas las condiciones para ser disparada.
+     *
+     * @param transicion Índice de la transición a verificar
+     * @return true si la transición no está en espera y está sensibilizada,
+     * false si está en espera o no está sensibilizada
+     */
+    private boolean puedeDispararse(int transicion) {
+        // Verifica que la transición no esté en espera y que esté sensibilizada
+        return !redDePetri.transicionEnEspera(transicion) && estaTransicionSensibilizada(transicion);
     }
 
     /**
@@ -175,7 +282,7 @@ public class Monitor implements MonitorInterface {
     private int[] obtenerTransiciones() {
         // Obtiene las transiciones sensibilizadas y en cola
         long tiempo = System.currentTimeMillis();
-        int[] sensibilizadas = redDePetri.getSensibilizadas();
+        int[] sensibilizadas = redDePetri.getSensibilizadasTiempo(tiempo);
         int[] enCola = transicionesEnCola();
         int[] transiciones = new int[TRANSICIONES_TOTALES];
         // And entre transiciones sensibilizadas y en cola
