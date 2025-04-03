@@ -11,8 +11,11 @@
 import agencia.Agencia;
 import agencia.Proceso;
 import threadfactory.MyThreadFactory;
+import logger.Log;
 
 public class Main {
+
+    private static final Log logger = Log.getInstancia();
 
     /**
      * Metodo principal que inicia la aplicación.
@@ -75,6 +78,7 @@ public class Main {
 
     /**
      * Ejecuta cada proceso en un hilo independiente y espera a que todos terminen.
+     * Además, ejecuta el proceso loggerThread que tomara registro de los acontencimientos de la red de petri
      *
      * @param threadFactory La fábrica de hilos que se utilizará para crear los hilos
      * @param procesos      Array de procesos que se ejecutarán concurrentemente
@@ -88,6 +92,10 @@ public class Main {
             hilos[i].start();
         }
 
+        // Crea un hilo para el logger usando threadFactory
+        Thread loggerThread = threadFactory.newThread(logger);
+        loggerThread.start();
+
         // Esperar a que todos los hilos de proceso terminen
         for (int i = 0; i < procesos.length; i++) {
             try {
@@ -96,6 +104,17 @@ public class Main {
                 System.err.println("Error al esperar la finalización del proceso " + i);
                 e.printStackTrace();
             }
+        }
+
+        // Una vez que todos los procesos han terminado, notifica al logger
+        // para que genere el informe final con las estadísticas recopiladas
+        logger.setTerminado(true);
+        // Esperar a que el logger termine (con timeout para evitar bloqueos)
+        try {
+            loggerThread.join(2000);  // Esperar hasta 2 segundos
+        } catch (InterruptedException e) {
+            System.err.println("Error al esperar que el logger termine");
+            e.printStackTrace();
         }
     }
 }
