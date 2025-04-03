@@ -3,6 +3,7 @@ package monitor;
 import java.util.concurrent.Semaphore;
 
 import rdp.RedDePetri;
+import logger.Log;
 
 /**
  * Clase Monitor que implementa el patrón de diseño Singleton para la sincronización
@@ -15,6 +16,8 @@ import rdp.RedDePetri;
  * cuando intentan disparar transiciones no sensibilizadas en la Red de Petri.
  */
 public class Monitor implements MonitorInterface {
+
+    private static final Log loggerThread = Log.getInstancia();
 
     // Constantes
     private static final int DISPAROS_TOTALES = 186;
@@ -242,6 +245,15 @@ public class Monitor implements MonitorInterface {
      * Si no hay transiciones para despertar, libera el mutex para que otro proceso pueda acceder.
      */
     private void liberarMutex() {
+
+        if (disparosCompletados()) {
+            if (!liberarHilos()) {
+                loggerThread.setTdisparadas(redDePetri.getTransicionesDisparadas());
+                loggerThread.setDisparoPorT(redDePetri.getDisparos());
+                loggerThread.setInvariantes(redDePetri.invariantesTransicion());
+            }
+        }
+
         if (!despertarTransicion()) {
             mutex.release();
         }
@@ -251,15 +263,24 @@ public class Monitor implements MonitorInterface {
     }
 
     /**
-     * Libera todos los hilos en espera.
-     * Se utiliza cuando se han completado todos los disparos requeridos.
+     * Intenta liberar un hilo que esté esperando en alguno de los semáforos de cola.
+     * Recorre todos los semáforos y libera el primer hilo que encuentra en espera.
+     * <p>
+     * Este metodo se utiliza cuando se han completado los disparos requeridos para
+     * permitir que los hilos salgan de su estado de espera de manera controlada.
+     *
+     * @return true si no había hilos en espera (todos los semáforos vacíos),
+     * false si se encontró y liberó un hilo (al menos un semáforo tenía hilos)
      */
-    private void liberarHilos() {
+    private boolean liberarHilos() {
         for (int i = 0; i < cola.length; i++) {
             if (cola[i].hasQueuedThreads()) {
                 cola[i].release();
+                return false;
             }
         }
+
+        return true;
     }
 
     // ===================================================================================

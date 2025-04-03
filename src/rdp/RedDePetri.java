@@ -473,6 +473,62 @@ public class RedDePetri {
         return respetaInvariantes;
     }
 
+    /**
+     * Verifica si todas las transiciones de un invariante han sido disparadas al menos una vez.
+     * <p>
+     * Este método es utilizado como parte del análisis de invariantes de transición
+     * para determinar si un ciclo completo puede haber ocurrido.
+     *
+     * @param invariante Array con los índices de las transiciones que forman el invariante
+     * @param disparos   Array con el conteo de disparos de cada transición
+     * @return true si todas las transiciones del invariante han sido disparadas al menos una vez,
+     * false si alguna transición no ha sido disparada
+     */
+    private boolean verificarCombinacion(int[] invariante, int[] disparos) {
+        for (int t : invariante) {
+            if (disparos[t] == 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Calcula cuántas veces se ha completado cada invariante de transición.
+     * <p>
+     * Un invariante de transición se considera completado cuando todas sus
+     * transiciones han sido disparadas al menos una vez. Este método utiliza
+     * un enfoque iterativo para calcular el número máximo de veces que cada
+     * invariante puede haberse completado, basándose en los contadores de disparos.
+     *
+     * @return Array donde cada posición indica cuántas veces se ha completado
+     * el invariante correspondiente
+     */
+    public int[] invariantesTransicion() {
+        int[][] invariantes = getInvariantesDeTransicion();
+        int[] disparosTransicion = Arrays.copyOf(disparos, disparos.length);
+        int[] vecesCompletada = new int[invariantes.length];
+        boolean cambios;
+
+        do {
+            cambios = false;
+            for (int i = 0; i < invariantes.length; i++) {
+                int[] invariante = invariantes[i];
+                if (verificarCombinacion(invariante, disparosTransicion)) {
+                    // Si todas las transiciones del invariante han sido disparadas,
+                    // reducimos el contador de cada una y aumentamos el contador del invariante
+                    for (int t : invariante) {
+                        disparosTransicion[t]--;
+                    }
+                    vecesCompletada[i]++;
+                    cambios = true;
+                }
+            }
+        } while (cambios);
+
+        return vecesCompletada;
+    }
+
     // ===================================================================================
     // Métodos para estado de espera y tiempo
     // ===================================================================================
