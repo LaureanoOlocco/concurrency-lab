@@ -4,8 +4,6 @@ import java.util.concurrent.Semaphore;
 
 import rdp.RedDePetri;
 
-//import logger.LoggerThread;
-
 /**
  * Clase Monitor que implementa el patrón de diseño Singleton para la sincronización
  * de procesos concurrentes que operan sobre una Red de Petri.
@@ -18,45 +16,23 @@ import rdp.RedDePetri;
  */
 public class Monitor implements MonitorInterface {
 
-    //private static final LoggerThread logger = LoggerThread.getInstancia();
+    // Constantes
+    private static final int DISPAROS_TOTALES = 186;
+    private static final int TRANSICIONES_TOTALES = 12;
 
-    /**
-     * Número total de disparos a realizar en la simulación
-     */
-    private final static int DISPAROS_TOTALES = 186;
+    // Componente del patrón Singleton
+    private static volatile Monitor monitor;
 
-    /**
-     * Número total de transiciones de la Red de Petri
-     */
-    private final static int TRANSICIONES_TOTALES = 12;
-
-    /**
-     * Instancia única del Monitor (patrón Singleton)
-     * Tiene como finalidad mantener la consistencia y la visibilidad del objeto
-     * monitor a través de todos los hilos.
-     */
-    private static volatile Monitor monitor; //
-
-    /**
-     * Semáforo para garantizar exclusión mutua en el acceso a la Red de Petri
-     */
+    // Componentes de sincronización
     private static Semaphore mutex;
-
-    /**
-     * Arreglo de semáforos para encolar procesos bloqueados por transición
-     */
     private static Semaphore[] cola;
 
-    /**
-     * Instancia de la Red de Petri que utiliza el monitor
-     */
+    // Componentes del modelo
     private static RedDePetri redDePetri;
-
-    /**
-     * Política de selección de transiciones a despertar
-     */
     private static Politica politica;
 
+    // Logging (comentado)
+    // private static final LoggerThread logger = LoggerThread.getInstancia();
 
     /**
      * Constructor privado que inicializa los componentes del monitor.
@@ -81,7 +57,7 @@ public class Monitor implements MonitorInterface {
      */
     public static Monitor getInstanciaMonitor() {
         if (monitor == null) { // Primera comprobación (sincronización externa)
-            synchronized (Monitor.class) { // Actúa Como un candado global para toda la clase. Si fuera this cada hilo crearia su propio lock.
+            synchronized (Monitor.class) { // Actúa como un candado global para toda la clase
                 if (monitor == null) { // Segunda comprobación (sincronización interna)
                     monitor = new Monitor();
                 }
@@ -110,6 +86,7 @@ public class Monitor implements MonitorInterface {
                 liberarMutex();
                 break;
             }
+
             puedeDisparar = puedeDispararse(transicion);
             // Intenta disparar la transición
             disparoEfectuado = redDePetri.disparar(transicion, puedeDisparar);
@@ -131,6 +108,10 @@ public class Monitor implements MonitorInterface {
         return disparoEfectuado;
     }
 
+    // ===================================================================================
+    // Métodos para gestión de transiciones temporales
+    // ===================================================================================
+
     /**
      * Verifica si una transición está antes de su ventana temporal.
      * <p>
@@ -147,13 +128,11 @@ public class Monitor implements MonitorInterface {
         // Solo aplica a transiciones con restricciones temporales
         if (redDePetri.esTransicionTemporal(transicion)) {
             // Verifica si la transición está sensibilizada en tiempo
-            // Está fuera (antes) de la ventana temporal
             // Si está en la ventana devuelve false, si no devuelve true
             return !redDePetri.estaSensibilizadaEnTiempo(transicion, tiempoActual);
         }
         return false; // No es una transición temporal
     }
-
 
     /**
      * Realiza la espera necesaria cuando una transición debe retrasar su disparo.
@@ -211,7 +190,9 @@ public class Monitor implements MonitorInterface {
             // Verifica si está antes de su ventana temporal
             if (estaAntesDeVentanaTemporal(transicion, tiempoActual)) {
                 // Calcula cuánto tiempo debe esperar para alcanzar el límite inferior
-                long tiempoEspera = redDePetri.getTimeStamp(transicion) + redDePetri.obtenerTiempoMinimo(transicion) - tiempoActual;
+                long tiempoEspera = redDePetri.getTimeStamp(transicion) +
+                        redDePetri.obtenerTiempoMinimo(transicion) -
+                        tiempoActual;
 
                 // Espera el tiempo necesario
                 esperarTiempoMinimo(transicion, tiempoEspera);
@@ -234,8 +215,13 @@ public class Monitor implements MonitorInterface {
      */
     private boolean puedeDispararse(int transicion) {
         // Verifica que la transición no esté en espera y que esté sensibilizada
-        return !redDePetri.transicionEnEspera(transicion) && estaTransicionSensibilizada(transicion);
+        return !redDePetri.transicionEnEspera(transicion) &&
+                estaTransicionSensibilizada(transicion);
     }
+
+    // ===================================================================================
+    // Métodos para gestión de sincronización
+    // ===================================================================================
 
     /**
      * Adquiere el semáforo de exclusión mutua para disparar la Red de Petri.
@@ -252,13 +238,33 @@ public class Monitor implements MonitorInterface {
     }
 
     /**
-     * Verifica si se completaron los disparos requeridos.
-     *
-     * @return true si se han completado todos los disparos, false en caso contrario
+     * Si hay alguna transición sensibilizada con procesos en cola, despierta uno de esos procesos.
+     * Si no hay transiciones para despertar, libera el mutex para que otro proceso pueda acceder.
      */
-    private boolean disparosCompletados() {
-        return redDePetri.getDisparos()[11] >= DISPAROS_TOTALES;
+    private void liberarMutex() {
+        if (!despertarTransicion()) {
+            mutex.release();
+        }
+        System.out.println(Thread.currentThread().getName() +
+                " libero el mutex, permisos: " +
+                mutex.availablePermits());
     }
+
+    /**
+     * Libera todos los hilos en espera.
+     * Se utiliza cuando se han completado todos los disparos requeridos.
+     */
+    private void liberarHilos() {
+        for (int i = 0; i < cola.length; i++) {
+            if (cola[i].hasQueuedThreads()) {
+                cola[i].release();
+            }
+        }
+    }
+
+    // ===================================================================================
+    // Métodos para selección y desbloqueo de transiciones
+    // ===================================================================================
 
     /**
      * Obtiene un arreglo que indica qué transiciones tienen procesos esperando en sus colas.
@@ -275,7 +281,7 @@ public class Monitor implements MonitorInterface {
 
     /**
      * Obtiene un arreglo que indica qué transiciones están sensibilizadas y están en la cola.
-     * Realiza una operación AND entre las transiciones sensibilizadas y las que están en la variable de condición (cola).
+     * Realiza una operación AND entre las transiciones sensibilizadas y las que están en la cola.
      *
      * @return Un arreglo con las transiciones que cumplen ambas condiciones
      */
@@ -285,6 +291,7 @@ public class Monitor implements MonitorInterface {
         int[] sensibilizadas = redDePetri.getSensibilizadasTiempo(tiempo);
         int[] enCola = transicionesEnCola();
         int[] transiciones = new int[TRANSICIONES_TOTALES];
+
         // And entre transiciones sensibilizadas y en cola
         for (int i = 0; i < TRANSICIONES_TOTALES; i++) {
             transiciones[i] = sensibilizadas[i] & enCola[i];
@@ -294,10 +301,8 @@ public class Monitor implements MonitorInterface {
 
     /**
      * Intenta despertar un proceso que está en cola.
-     * Utiliza una política para elegir qué proceso despertar. (Proceso asociado a transiciones)
-     * Si no hay una transicion que cumpla con las condiciones de la politica devuelve la transicion T0
-     * <p>
-     * El metodo hasQueuedThreads se utiliza para asegurarse de que en tal caso T0 este en cola y no se rompa la cola
+     * Utiliza una política para elegir qué proceso despertar.
+     * Si no hay una transición que cumpla con las condiciones de la política devuelve la transición T0.
      *
      * @return true si se despertó algún proceso, false si no había procesos para despertar
      */
@@ -318,20 +323,11 @@ public class Monitor implements MonitorInterface {
     }
 
     /**
-     * Si hay alguna transición sensibilizada con procesos en cola, despierta uno de esos procesos.
-     * Si no hay transiciones para despertar, libera el mutex para que otro proceso pueda acceder.
+     * Verifica si se completaron los disparos requeridos.
+     *
+     * @return true si se han completado todos los disparos, false en caso contrario
      */
-    private void liberarMutex() {
-        if (!despertarTransicion()) mutex.release();
-        System.out.println(Thread.currentThread().getName() + " libero el mutex, permisos: " + mutex.availablePermits());
-
-    }
-
-    private void liberarHilos() {
-        for (int i = 0; i < cola.length; i++) {
-            if (cola[i].hasQueuedThreads()) {
-                cola[i].release();
-            }
-        }
+    private boolean disparosCompletados() {
+        return redDePetri.getDisparos()[11] >= DISPAROS_TOTALES;
     }
 }
