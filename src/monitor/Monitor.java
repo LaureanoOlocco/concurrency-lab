@@ -73,6 +73,11 @@ public class Monitor implements MonitorInterface {
      * Intenta disparar una transición en la Red de Petri.
      * Si la transición no está sensibilizada, el proceso se bloquea
      * hasta que otro proceso lo despierte.
+     * <p>
+     * Este ciclo do-while controla los intentos de disparo de la transición.
+     * Se ejecutará mientras se cumplan estas dos condiciones:
+     * 1. No se haya podido efectuar el disparo de la transición (! DisparoEfectuado)
+     * 2. No se hayan completado todos los disparos requeridos (! DisparosCompletados())
      *
      * @param transicion Número de transición a disparar
      * @return true si el disparo se completó con éxito, false en caso contrario
@@ -177,14 +182,14 @@ public class Monitor implements MonitorInterface {
      * 1. Tiene suficientes tokens en sus plazas de entrada (sensibilizada por marcado)
      * 2. Ha cumplido con el tiempo mínimo de espera si es una transición temporal
      * <p>
-     * Si la transición está sensibilizada por marcado pero aún no ha alcanzado
+     * Si la transición está sensibilizada por marcado, pero aún no ha alcanzado
      * su tiempo mínimo, este metodo hará que el hilo espere lo necesario.
      *
      * @param transicion Índice de la transición a verificar
      * @return true si la transición está sensibilizada (o lo estará después de esperar),
      * false si no está sensibilizada por marcado
      */
-    private boolean estaTransicionSensibilizada(int transicion) {
+    private boolean verificarMarcadoYTiempo(int transicion) {
         // Verifica primero si está sensibilizada por marcado
         if (redDePetri.estaTransicionSensibilizada(transicion)) {
             // Obtiene el tiempo actual
@@ -193,9 +198,7 @@ public class Monitor implements MonitorInterface {
             // Verifica si está antes de su ventana temporal
             if (estaAntesDeVentanaTemporal(transicion, tiempoActual)) {
                 // Calcula cuánto tiempo debe esperar para alcanzar el límite inferior
-                long tiempoEspera = redDePetri.getTimeStamp(transicion) +
-                        redDePetri.obtenerTiempoMinimo(transicion) -
-                        tiempoActual;
+                long tiempoEspera = redDePetri.getTimeStamp(transicion) + redDePetri.obtenerTiempoMinimo(transicion) - tiempoActual;
 
                 // Espera el tiempo necesario
                 esperarTiempoMinimo(transicion, tiempoEspera);
@@ -218,8 +221,7 @@ public class Monitor implements MonitorInterface {
      */
     private boolean puedeDispararse(int transicion) {
         // Verifica que la transición no esté en espera y que esté sensibilizada
-        return !redDePetri.transicionEnEspera(transicion) &&
-                estaTransicionSensibilizada(transicion);
+        return !redDePetri.transicionEnEspera(transicion) && verificarMarcadoYTiempo(transicion);
     }
 
     // ===================================================================================
@@ -301,45 +303,54 @@ public class Monitor implements MonitorInterface {
     }
 
     /**
-     * Obtiene un arreglo que indica qué transiciones están sensibilizadas y están en la cola.
-     * Realiza una operación AND entre las transiciones sensibilizadas y las que están en la cola.
+     * Obtiene un arreglo que indica qué transiciones están tanto sensibilizadas como en espera en la cola.
+     * Realiza una operación lógica AND entre el conjunto de transiciones sensibilizadas en el momento actual
+     * y aquellas que tienen procesos en espera (en cola).
      *
-     * @return Un arreglo con las transiciones que cumplen ambas condiciones
+     * @return Un arreglo binario donde cada posición indica si la transición correspondiente está
+     * sensibilizada y en cola (1 si cumple ambas condiciones, 0 en caso contrario).
      */
     private int[] obtenerTransiciones() {
-        // Obtiene las transiciones sensibilizadas y en cola
-        long tiempo = System.currentTimeMillis();
-        int[] sensibilizadas = redDePetri.getSensibilizadasTiempo(tiempo);
-        int[] enCola = transicionesEnCola();
-        int[] transiciones = new int[TRANSICIONES_TOTALES];
+        long tiempoActual = System.currentTimeMillis();
 
-        // And entre transiciones sensibilizadas y en cola
+        // Transiciones que están sensibilizadas en el momento actual
+        int[] transicionesSensibilizadas = redDePetri.getSensibilizadasTiempo(tiempoActual);
+
+        // Transiciones que tienen procesos esperando en la cola
+        int[] transicionesEnEspera = transicionesEnCola();
+
+        int[] transicionesDisponibles = new int[TRANSICIONES_TOTALES];
+
+        // Combina ambas condiciones mediante una operación AND
         for (int i = 0; i < TRANSICIONES_TOTALES; i++) {
-            transiciones[i] = sensibilizadas[i] & enCola[i];
+            transicionesDisponibles[i] = transicionesSensibilizadas[i] & transicionesEnEspera[i];
         }
-        return transiciones;
+
+        return transicionesDisponibles;
     }
 
     /**
-     * Intenta despertar un proceso que está en cola.
-     * Utiliza una política para elegir qué proceso despertar.
-     * Si no hay una transición que cumpla con las condiciones de la política devuelve la transición T0.
+     * Intenta despertar un proceso que está en espera en la cola, utilizando una política de selección.
+     * Primero obtiene las transiciones que están activas (sensibilizadas) y con procesos en espera.
+     * Luego, aplica una política para decidir cuál transición disparar. Si la transición seleccionada
+     * tiene procesos en espera, se libera para que uno de ellos continúe su ejecución.
      *
-     * @return true si se despertó algún proceso, false si no había procesos para despertar
+     * @return true si se despertó un proceso, false si no había procesos para despertar o
+     * ninguna transición cumplía con los criterios.
      */
     private boolean despertarTransicion() {
-        // Obtiene las transiciones sensibilizadas y en cola
-        int[] t = obtenerTransiciones();
+        // Obtiene las transiciones que están sensibilizadas y en cola
+        int[] transicionesDisponibles = obtenerTransiciones();
 
-        // Llama a la política para elegir transición
-        int tADisparar = politica.elegirPolitica(t);
+        // Aplica la política para elegir qué transición disparar
+        int transicionElegida = politica.elegirPolitica(transicionesDisponibles);
 
-        // Si la transición obtenida está en cola
-        if (cola[tADisparar].hasQueuedThreads()) {
-            // La libera
-            cola[tADisparar].release();
+        // Verifica si hay procesos esperando en la cola de esa transición
+        if (cola[transicionElegida].hasQueuedThreads()) {
+            cola[transicionElegida].release(); // Despierta al proceso
             return true;
         }
+
         return false;
     }
 

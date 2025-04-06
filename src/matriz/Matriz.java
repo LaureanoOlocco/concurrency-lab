@@ -1,11 +1,13 @@
 package matriz;
 
+import rdp.RedDePetri;
+
 import java.util.Arrays;
 
 /**
  * Clase de utilidad para operaciones con matrices.
  */
-public final class Matriz {
+public final class Matriz extends RedDePetri {
 
     private Matriz() {  // Constructor privado para evitar instanciación
         throw new AssertionError("Clase de utilidad");
@@ -14,7 +16,7 @@ public final class Matriz {
     /**
      * Crea una matriz de transición con un 1 en la posición especificada.
      *
-     * @param t Posición de la transición
+     * @param t            Posición de la transición
      * @param transiciones Tamaño de la matriz
      * @return Matriz de transición
      * @throws IllegalArgumentException si t es negativo o mayor que transiciones
@@ -40,7 +42,7 @@ public final class Matriz {
      * @param matrizTransicion Matriz de transición
      * @return Resultado de la multiplicación
      * @throws IllegalArgumentException si las dimensiones no son compatibles
-     * @throws NullPointerException si alguna matriz es nula
+     * @throws NullPointerException     si alguna matriz es nula
      */
     public static int[] multiplicarMatriz(int[][] matrizIncidencia, int[] matrizTransicion) {
         // Validar entradas nulas
@@ -78,10 +80,10 @@ public final class Matriz {
      * Suma dos matrices unidimensionales.
      *
      * @param matrizMarcado Primera matriz
-     * @param matrizM Segunda matriz
+     * @param matrizM       Segunda matriz
      * @return Suma de las matrices
      * @throws IllegalArgumentException si las dimensiones son diferentes
-     * @throws NullPointerException si alguna matriz es nula
+     * @throws NullPointerException     si alguna matriz es nula
      */
     public static int[] sumarMatriz(int[] matrizMarcado, int[] matrizM) {
         // Validar entradas nulas

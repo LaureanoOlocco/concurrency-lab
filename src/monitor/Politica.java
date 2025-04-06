@@ -16,7 +16,7 @@ public class Politica {
     }
 
     // Política actualmente seleccionada
-    private final static TipoPolitica POLITICA = TipoPolitica.POLITICA_PROCESAMIENTO_PRIORIZADA;
+    private final static TipoPolitica POLITICA = TipoPolitica.POLITICA_BALANCEADA;
 
     // Umbrales para la política 2
     private static final double UMBRAL_AGENTE_SUPERIOR = 0.75;

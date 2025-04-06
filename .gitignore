@@ -78,4 +78,4 @@ build/
 java/build/**
 bin
 
-/logger.txt
+/log.txt

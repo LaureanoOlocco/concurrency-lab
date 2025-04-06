@@ -476,7 +476,7 @@ public class RedDePetri {
     /**
      * Verifica si todas las transiciones de un invariante han sido disparadas al menos una vez.
      * <p>
-     * Este método es utilizado como parte del análisis de invariantes de transición
+     * Este Metodo es utilizado como parte del análisis de invariantes de transición
      * para determinar si un ciclo completo puede haber ocurrido.
      *
      * @param invariante Array con los índices de las transiciones que forman el invariante
@@ -497,7 +497,7 @@ public class RedDePetri {
      * Calcula cuántas veces se ha completado cada invariante de transición.
      * <p>
      * Un invariante de transición se considera completado cuando todas sus
-     * transiciones han sido disparadas al menos una vez. Este método utiliza
+     * transiciones han sido disparadas al menos una vez. Este metodo utiliza
      * un enfoque iterativo para calcular el número máximo de veces que cada
      * invariante puede haberse completado, basándose en los contadores de disparos.
      *
