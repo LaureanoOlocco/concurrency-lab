@@ -34,8 +34,6 @@ public class Monitor implements MonitorInterface {
     private static RedDePetri redDePetri;
     private static Politica politica;
 
-    // Logging (comentado)
-    // private static final LoggerThread logger = LoggerThread.getInstancia();
 
     /**
      * Constructor privado que inicializa los componentes del monitor.
@@ -43,10 +41,15 @@ public class Monitor implements MonitorInterface {
      */
     private Monitor() {
         mutex = new Semaphore(1);
+
+        // La cola de semáforos se inicializa con 0 permisos para que los hilos
+        // que intenten adquirirlos queden bloqueados hasta que sean liberados
+        // explícitamente por otro hilo
         cola = new Semaphore[TRANSICIONES_TOTALES];
         for (int i = 0; i < TRANSICIONES_TOTALES; i++) {
             cola[i] = new Semaphore(0);
         }
+
         redDePetri = new RedDePetri();
         politica = new Politica(redDePetri);
     }
@@ -83,6 +86,8 @@ public class Monitor implements MonitorInterface {
      * @return true si el disparo se completó con éxito, false en caso contrario
      */
     public boolean fireTransition(int transicion) {
+
+        //Adquiere el mutex dispara y libera el mutex, el resto lo hace sin mutex.
         adquirirMutex();
         boolean disparoEfectuado = false;
         boolean puedeDisparar = false;
