@@ -215,7 +215,7 @@ public class RedDePetri {
         transicionesDisparadas = "";
 
         // Configuración de tiempos de transiciones
-        setTiempos(1);
+        setTiempos(3);
     }
 
     /**
