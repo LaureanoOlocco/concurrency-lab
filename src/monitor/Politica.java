@@ -28,8 +28,11 @@ public class Politica {
     private static final int TRANSICION_RESERVA_CONFIRMADA = 6;
     private static final int TRANSICION_RESERVA_CANCELADA = 7;
 
+    // Transiciones sin prioridad específica
+    private static final int[] TRANSICIONES_SIN_PRIORIDAD = {0, 1, 4, 5, 8, 9, 10, 11};
+
     private RedDePetri redDePetri;
-    int[] disparos;
+    int[] disparosPorTransicion;
 
     /**
      * Constructor que inicializa la clase con una Red de Petri.
@@ -38,7 +41,7 @@ public class Politica {
      */
     public Politica(RedDePetri redDePetri) {
         this.redDePetri = redDePetri;
-        disparos = redDePetri.getDisparos();
+        disparosPorTransicion = redDePetri.getDisparos();
     }
 
     /**
@@ -55,8 +58,8 @@ public class Politica {
 
         for (int i = 0; i < transiciones.length; i++) {
             // Si la transicion está sensibilizada y cumple la variable de condición
-            if (transiciones[i] == 1 && disparos[i] < cantDisparos) {
-                cantDisparos = disparos[i];
+            if (transiciones[i] == 1 && disparosPorTransicion[i] < cantDisparos) {
+                cantDisparos = disparosPorTransicion[i];
                 transicion = i;
             }
         }
@@ -76,15 +79,15 @@ public class Politica {
      */
     private int politicaProcesamientoPriorizada(int[] transiciones) {
         // Cálculo de totales para evitar división por cero
-        int totalAtendidos = disparos[TRANSICION_AGENTE_SUPERIOR] + disparos[TRANSICION_AGENTE_REGULAR];
-        int totalReservas = disparos[TRANSICION_RESERVA_CONFIRMADA] + disparos[TRANSICION_RESERVA_CANCELADA];
+        int totalAtendidos = disparosPorTransicion[TRANSICION_AGENTE_SUPERIOR] + disparosPorTransicion[TRANSICION_AGENTE_REGULAR];
+        int totalReservas = disparosPorTransicion[TRANSICION_RESERVA_CONFIRMADA] + disparosPorTransicion[TRANSICION_RESERVA_CANCELADA];
 
         if (totalAtendidos == 0) totalAtendidos = 1;
         if (totalReservas == 0) totalReservas = 1;
 
         // Cálculo de proporciones para toma de decisiones
-        double agenteSuperior = disparos[TRANSICION_AGENTE_SUPERIOR] / (double) totalAtendidos;
-        double reservasConfirmadas = disparos[TRANSICION_RESERVA_CONFIRMADA] / (double) totalReservas;
+        double agenteSuperior = disparosPorTransicion[TRANSICION_AGENTE_SUPERIOR] / (double) totalAtendidos;
+        double reservasConfirmadas = disparosPorTransicion[TRANSICION_RESERVA_CONFIRMADA] / (double) totalReservas;
 
         // PRIORIDAD 1: Prioriza al agente de reservas superior según proporción actual
         if (transiciones[TRANSICION_AGENTE_SUPERIOR] == 1 || transiciones[TRANSICION_AGENTE_REGULAR] == 1) {
@@ -110,8 +113,8 @@ public class Politica {
 
         // PRIORIDAD 3: Si no se cumplen las prioridades anteriores, buscamos otras transiciones
         // Listado de transiciones sin criterios de prioridad específicos
-        int[] transicionesSinPrioridad = {0, 1, 4, 5, 8, 9, 10, 11};
-        for (int i : transicionesSinPrioridad) {
+
+        for (int i : TRANSICIONES_SIN_PRIORIDAD) {
             if (transiciones[i] == 1) {
                 return i;
             }
