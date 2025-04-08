@@ -206,7 +206,7 @@ public class Monitor implements MonitorInterface {
                 long tiempoEspera = redDePetri.getTimeStamp(transicion) + redDePetri.obtenerTiempoMinimo(transicion) - tiempoActual;
 
                 // Espera el tiempo necesario
-                esperarTiempoMinimo(transicion, tiempoEspera);
+                esperarTiempoMinimo(transicion, tiempoEspera);// Volver a chequear que las condiciones esten dadas!
             }
 
             // La transición está completamente sensibilizada (o lo estará después de esperar)
